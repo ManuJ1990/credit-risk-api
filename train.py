@@ -11,8 +11,8 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_score, recall_score, roc_auc_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from xgboost import XGBClassifier
 
 ROOT = Path(__file__).resolve().parent
@@ -62,12 +62,23 @@ def encode_ordinal(df):
     return df, encoding
 
 
-def train_and_evaluate(X, y):
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE
-    )
+def encode_categorical(df):
+    """Kategorische Spalten als pandas-Typ 'category' markieren.
 
-    model = XGBClassifier(
+    XGBoost erkennt den Typ und darf dann beliebige Kategorien-Gruppen
+    trennen, statt nur entlang der alphabetischen Reihenfolge zu schneiden.
+    """
+    df = df.copy()
+    categorical_cols = [c for c in df.columns if df[c].dtype == "object"]
+
+    for col in categorical_cols:
+        df[col] = df[col].astype("category")
+
+    return df
+
+
+def build_model(enable_categorical=False):
+    return XGBClassifier(
         n_estimators=100,
         max_depth=4,
         learning_rate=0.1,
@@ -77,7 +88,16 @@ def train_and_evaluate(X, y):
         scale_pos_weight=700 / 300,
         random_state=RANDOM_STATE,
         eval_metric="logloss",
+        enable_categorical=enable_categorical,
     )
+
+
+def train_and_evaluate(X, y, enable_categorical=False):
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE
+    )
+
+    model = build_model(enable_categorical)
     model.fit(X_train, y_train)
 
     # TODO: predict() schneidet bei 0.5 – sklearn-Default, keine bewusste
@@ -91,6 +111,19 @@ def train_and_evaluate(X, y):
         "recall": recall_score(y_test, y_pred),
     }
     return model, metrics
+
+
+def cross_val_auc(X, y, enable_categorical=False, n_splits=5):
+    """Mittlere AUC über mehrere Aufteilungen, plus Streuung.
+
+    Ein einzelner Train/Test-Split schwankt bei 1000 Zeilen zu stark,
+    um kleine Unterschiede zwischen Varianten zu beurteilen.
+    """
+    folds = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
+    scores = cross_val_score(
+        build_model(enable_categorical), X, y, cv=folds, scoring="roc_auc"
+    )
+    return scores.mean(), scores.std()
 
 
 def save(model, encoding, X):
@@ -112,20 +145,28 @@ def save(model, encoding, X):
 
 def main():
     df = load_data()
+    y = df[TARGET]
 
-    df_encoded, encoding = encode_ordinal(df)
+    df_ordinal, encoding = encode_ordinal(df)
+    X_ordinal = df_ordinal.drop(columns=[TARGET])
+    model, metrics_ordinal = train_and_evaluate(X_ordinal, y)
 
-    X = df_encoded.drop(columns=[TARGET])
-    y = df_encoded[TARGET]
+    X_categorical = encode_categorical(df).drop(columns=[TARGET])
+    _, metrics_categorical = train_and_evaluate(
+        X_categorical, y, enable_categorical=True
+    )
 
-    model, metrics = train_and_evaluate(X, y)
+    for name, m, X, cat in [
+        ("ordinal", metrics_ordinal, X_ordinal, False),
+        ("categorical", metrics_categorical, X_categorical, True),
+    ]:
+        mean, std = cross_val_auc(X, y, enable_categorical=cat)
+        print(
+            f"{name:12s} AUC {m['auc']:.3f}  P {m['precision']:.2f}  "
+            f"R {m['recall']:.2f}  CV {mean:.3f} +/- {std:.3f}"
+        )
 
-    print(f"AUC-ROC:   {metrics['auc']:.3f}")
-    print(f"Precision: {metrics['precision']:.2f}")
-    print(f"Recall:    {metrics['recall']:.2f}")
-
-    save(model, encoding, X)
-
+    save(model, encoding, X_ordinal)
     print("Modell   ->", MODEL_PATH)
     print("Mapping  ->", MAPPING_PATH)
 
