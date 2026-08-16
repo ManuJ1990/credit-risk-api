@@ -5,6 +5,7 @@
 Kein Produktionscode – das Ergebnis steht im Commit und im README.
 """
 
+import mlflow
 import pandas as pd
 
 from train import (
@@ -14,6 +15,8 @@ from train import (
     load_data,
     train_and_evaluate,
 )
+
+mlflow.set_experiment("encoding-comparison")
 
 
 def encode_categorical(df):
@@ -53,10 +56,21 @@ variants = [
 
 for name, df_encoded, enable_categorical in variants:
     X = df_encoded.drop(columns=[TARGET])
-    _, metrics = train_and_evaluate(X, y, enable_categorical=enable_categorical)
-    mean, std = cross_val_auc(X, y, enable_categorical=enable_categorical)
-    print(
-        f"{name:12s} {X.shape[1]:3d} Merkmale  AUC {metrics['auc']:.3f}  "
-        f"P {metrics['precision']:.2f}  R {metrics['recall']:.2f}  "
-        f"CV {mean:.3f} +/- {std:.3f}"
-    )
+
+    with mlflow.start_run(run_name=name):
+        _, metrics = train_and_evaluate(X, y, enable_categorical=enable_categorical)
+        mean, std = cross_val_auc(X, y, enable_categorical=enable_categorical)
+
+        mlflow.log_param("encoding", name)
+        mlflow.log_param("n_features", X.shape[1])
+        mlflow.log_metric("holdout_auc", metrics["auc"])
+        mlflow.log_metric("precision", metrics["precision"])
+        mlflow.log_metric("recall", metrics["recall"])
+        mlflow.log_metric("cv_auc", mean)
+        mlflow.log_metric("cv_std", std)
+
+        print(
+            f"{name:12s} {X.shape[1]:3d} Merkmale  AUC {metrics['auc']:.3f}  "
+            f"P {metrics['precision']:.2f}  R {metrics['recall']:.2f}  "
+            f"CV {mean:.3f} +/- {std:.3f}"
+        )

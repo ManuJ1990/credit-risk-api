@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import joblib
+import mlflow
 import pandas as pd
 from sklearn.metrics import precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
@@ -19,9 +20,21 @@ ROOT = Path(__file__).resolve().parent
 DATA_PATH = ROOT / "data" / "raw" / "german.data"
 MODEL_PATH = ROOT / "models" / "model.pkl"
 MAPPING_PATH = ROOT / "models" / "feature_mapping.json"
+MLFLOW_EXPERIMENT = "credit-risk-training"
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
+
+MODEL_PARAMS = {
+    "n_estimators": 100,
+    "max_depth": 4,
+    "learning_rate": 0.1,
+    # TODO: Verhältnis aus y_train berechnen (559/241) statt aus dem
+    # Gesamtdatensatz. Fest eingetippt veraltet die Zahl still.
+    "scale_pos_weight": 700 / 300,
+    "random_state": RANDOM_STATE,
+    "eval_metric": "logloss",
+}
 
 # german.data hat keine Kopfzeile – Namen und Reihenfolge stammen aus german.doc.
 COLUMNS = [
@@ -63,18 +76,7 @@ def encode_ordinal(df):
 
 
 def build_model(enable_categorical=False):
-    return XGBClassifier(
-        n_estimators=100,
-        max_depth=4,
-        learning_rate=0.1,
-        # TODO: Verhältnis aus y_train nehmen (559/241) statt aus dem
-        # Gesamtdatensatz. Bleibt vorerst so, damit dieser Lauf das
-        # bestehende Modell exakt reproduziert.
-        scale_pos_weight=700 / 300,
-        random_state=RANDOM_STATE,
-        eval_metric="logloss",
-        enable_categorical=enable_categorical,
-    )
+    return XGBClassifier(**MODEL_PARAMS, enable_categorical=enable_categorical)
 
 
 def train_and_evaluate(X, y, enable_categorical=False):
@@ -129,22 +131,38 @@ def save(model, encoding, X):
 
 
 def main():
+    mlflow.set_experiment(MLFLOW_EXPERIMENT)
+
     df = load_data()
     y = df[TARGET]
 
     df_encoded, encoding = encode_ordinal(df)
     X = df_encoded.drop(columns=[TARGET])
 
-    model, metrics = train_and_evaluate(X, y)
-    mean, std = cross_val_auc(X, y)
+    with mlflow.start_run():
+        model, metrics = train_and_evaluate(X, y)
+        mean, std = cross_val_auc(X, y)
+        save(model, encoding, X)
+
+        mlflow.log_params(MODEL_PARAMS)
+        mlflow.log_param("encoding", "ordinal")
+        mlflow.log_param("test_size", TEST_SIZE)
+        mlflow.log_metrics(
+            {
+                "holdout_auc": metrics["auc"],
+                "precision": metrics["precision"],
+                "recall": metrics["recall"],
+                "cv_auc": mean,
+                "cv_std": std,
+            }
+        )
+        mlflow.log_artifact(str(MODEL_PATH))
+        mlflow.log_artifact(str(MAPPING_PATH))
 
     print(f"AUC (Holdout):   {metrics['auc']:.3f}")
     print(f"Precision:       {metrics['precision']:.2f}")
     print(f"Recall:          {metrics['recall']:.2f}")
     print(f"AUC (5-fold CV): {mean:.3f} +/- {std:.3f}")
-
-    save(model, encoding, X)
-
     print("Modell   ->", MODEL_PATH)
     print("Mapping  ->", MAPPING_PATH)
 
