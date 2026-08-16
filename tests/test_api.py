@@ -40,3 +40,19 @@ def test_predict_valid_input():
 def test_predict_invalid_input():
     response = client.post("/predict", json={"checking_status": "falsch"})
     assert response.status_code == 422
+
+
+def test_out_of_range_value_returns_422():
+    response = client.post("/predict", json={**SAMPLE_INPUT, "purpose": 99})
+
+    assert response.status_code == 422
+
+
+def test_top_factors_have_the_documented_shape():
+    factors = client.post("/predict", json=SAMPLE_INPUT).json()["top_factors"]
+
+    assert len(factors) == 3
+
+    for factor in factors:
+        assert set(factor) == {"feature", "value", "impact", "direction"}
+        assert factor["direction"] in ("increases_risk", "decreases_risk")
