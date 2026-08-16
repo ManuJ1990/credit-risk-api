@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 
 from app.explainer import get_top_factors
-from app.model import FEATURE_ORDER, THRESHOLDS, TRAINED_AT, predict
+from app.model import FEATURE_ORDER, MAPPING, THRESHOLDS, TRAINED_AT, predict
 from app.schemas import ApplicantInput
 
 logger = logging.getLogger(__name__)
@@ -39,3 +39,9 @@ def predict_risk(input_data: ApplicantInput):
         ) from exc
 
     return result
+
+
+@app.get("/schema")
+def schema():
+    """Feature-Reihenfolge, Encoding, Wertebereiche und Schwellen."""
+    return MAPPING

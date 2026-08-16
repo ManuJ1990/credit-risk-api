@@ -57,3 +57,10 @@ def test_top_factors_have_the_documented_shape():
     for factor in factors:
         assert set(factor) == {"feature", "value", "impact", "direction"}
         assert factor["direction"] in ("increases_risk", "decreases_risk")
+
+
+def test_schema_endpoint_exposes_the_contract():
+    body = client.get("/schema").json()
+
+    assert set(body) >= {"feature_order", "risk_thresholds", "categorical", "numeric"}
+    assert body["categorical"]["housing"]["A152"] == 1

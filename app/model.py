@@ -10,10 +10,10 @@ MODEL_PATH = Path(__file__).parent.parent / "models" / "model.pkl"
 MAPPING_PATH = Path(__file__).parent.parent / "models" / "feature_mapping.json"
 
 model = joblib.load(MODEL_PATH)
-_mapping = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
-THRESHOLDS = _mapping["risk_thresholds"]
-FEATURE_ORDER = _mapping["feature_order"]
-TRAINED_AT = _mapping["trained_at"]
+MAPPING = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
+THRESHOLDS = MAPPING["risk_thresholds"]
+FEATURE_ORDER = MAPPING["feature_order"]
+TRAINED_AT = MAPPING["trained_at"]
 
 
 def to_frame(input_data: dict) -> pd.DataFrame:
