@@ -1,3 +1,5 @@
+"""Modell laden, Eingaben aufbereiten, Risikozone bestimmen."""
+
 import json
 from pathlib import Path
 
@@ -29,6 +31,7 @@ def classify(score: float) -> str:
 
 
 def predict(input_data: dict) -> dict:
+    """Score und Risikozone fuer einen Antrag."""
     risk_score = float(model.predict_proba(to_frame(input_data))[0][1])
 
     return {

@@ -1,13 +1,12 @@
-"""
-Trainiert das Credit-Risk-Modell und schreibt Modell + Feature-Mapping nach models/.
+"""Trainiert das Credit-Risk-Modell und schreibt Modell + Feature-Mapping nach models/.
 
     python train.py
 
 Ersetzt den Trainingsteil aus notebooks/training.ipynb.
 """
 
-from datetime import datetime, timezone
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import joblib
@@ -56,14 +55,15 @@ COLUMNS = [
 TARGET = "risk"
 
 
-def load_data():
+def load_data() -> pd.DataFrame:
+    """Rohdaten laden und die Zielvariable auf 0/1 bringen."""
     df = pd.read_csv(DATA_PATH, sep=" ", header=None, names=COLUMNS)
     # 1/2 -> 0/1; Ausfall wird zur 1 und damit zur positiven Klasse.
     df[TARGET] = df[TARGET] - 1
     return df
 
 
-def encode_ordinal(df):
+def encode_ordinal(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """Kategorische Spalten alphabetisch durchnummerieren.
 
     Gibt eine encodierte Kopie und die Mappings zurück. Kein LabelEncoder,
@@ -82,7 +82,8 @@ def encode_ordinal(df):
     return df, encoding
 
 
-def build_model(y, enable_categorical=False):
+def build_model(y, enable_categorical: bool = False) -> XGBClassifier:
+    """XGBClassifier mit den Parametern aus MODEL_PARAMS."""
     # aus y statt fest, damit es zur tatsächlichen Klassenverteilung passt
     scale_pos_weight = (y == 0).sum() / (y == 1).sum()
 
@@ -93,7 +94,10 @@ def build_model(y, enable_categorical=False):
     )
 
 
-def train_and_evaluate(X, y, enable_categorical=False):
+def train_and_evaluate(
+    X: pd.DataFrame, y, enable_categorical: bool = False
+) -> tuple[XGBClassifier, dict[str, float]]:
+    """Auf dem Holdout-Split trainieren und Metriken zurueckgeben."""
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE
     )
@@ -116,7 +120,9 @@ def train_and_evaluate(X, y, enable_categorical=False):
     return model, metrics
 
 
-def cross_val_auc(X, y, enable_categorical=False, n_splits=5):
+def cross_val_auc(
+    X: pd.DataFrame, y, enable_categorical: bool = False, n_splits: int = 5
+) -> tuple[float, float]:
     """Mittlere AUC über mehrere Aufteilungen, plus Streuung.
 
     Ein einzelner Train/Test-Split schwankt bei 1000 Zeilen zu stark,
@@ -130,13 +136,14 @@ def cross_val_auc(X, y, enable_categorical=False, n_splits=5):
     return scores.mean(), scores.std()
 
 
-def save(model, encoding, X):
+def save(model: XGBClassifier, encoding: dict, X: pd.DataFrame) -> None:
+    """Modell und feature_mapping.json nach models/ schreiben."""
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, MODEL_PATH)
 
     # Single source of truth für app/ und das Portfolio-Widget.
     mapping = {
-        "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "trained_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "feature_order": list(X.columns),
         "risk_thresholds": RISK_THRESHOLDS,
         "categorical": encoding,
@@ -149,7 +156,8 @@ def save(model, encoding, X):
     MAPPING_PATH.write_text(json.dumps(mapping, indent=2), encoding="utf-8")
 
 
-def main():
+def main() -> None:
+    """Trainieren, bewerten, speichern und den Lauf in MLflow protokollieren."""
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
 
     df = load_data()

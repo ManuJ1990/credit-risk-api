@@ -2,3 +2,4 @@
 mlflow
 pytest
 httpx
+ruff

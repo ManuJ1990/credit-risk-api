@@ -1,6 +1,6 @@
 """Herleitung der Risiko-Schwellen aus der Kostenmatrix in german.doc.
 
-    python -m experiments.find_thresholds
+python -m experiments.find_thresholds
 """
 
 import numpy as np
@@ -16,8 +16,7 @@ from train import (
     load_data,
 )
 
-
-# untere Grenze aus dem Kostenminimum der Tabelle oben,
+# untere Grenze aus dem Minimum der Kostenkurve (siehe Ausgabe),
 # obere Grenze als Politikentscheidung: darueber wird nicht mehr geprueft
 T_LOW = 0.20
 T_HIGH = 0.50
@@ -78,6 +77,6 @@ for seed in range(30):
 
 print()
 print("Gegenprobe ueber 30 Aufteilungen")
-print(f"  Schwelle auf Haelfte A                 {np.mean(found):.2f} +/- {np.std(found):.2f}")
+print(f"  Schwelle auf Haelfte A   {np.mean(found):.2f} +/- {np.std(found):.2f}")
 print(f"  Kosten je Fall auf B, Schwelle von A   {np.mean(transferred):.3f}")
 print(f"  Kosten je Fall auf B, t = 0.50         {np.mean(baseline):.3f}")

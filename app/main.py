@@ -1,3 +1,5 @@
+"""FastAPI-Endpunkte der Credit Risk API."""
+
 import logging
 
 from fastapi import FastAPI, HTTPException
@@ -13,6 +15,7 @@ app = FastAPI(title="Credit Risk API")
 
 @app.get("/health")
 def health():
+    """Status, Trainingsdatum des Modells und aktive Schwellen."""
     return {
         "status": "ok",
         "model_trained_at": TRAINED_AT,
@@ -23,13 +26,16 @@ def health():
 
 @app.post("/predict")
 def predict_risk(input_data: ApplicantInput):
+    """Risikozone und die drei einflussreichsten Felder fuer einen Antrag."""
     data = input_data.model_dump()
 
     try:
         result = predict(data)
         result["top_factors"] = get_top_factors(data)
-    except Exception:
+    except Exception as exc:
         logger.exception("Vorhersage fehlgeschlagen fuer %s", data)
-        raise HTTPException(status_code=500, detail="Vorhersage fehlgeschlagen")
+        raise HTTPException(
+            status_code=500, detail="Vorhersage fehlgeschlagen"
+        ) from exc
 
     return result

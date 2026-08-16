@@ -1,5 +1,6 @@
 from app.model import THRESHOLDS, classify
 
+
 def test_below_low_threshold():
     assert classify(0.0) == "low"
     assert classify(0.19) == "low"

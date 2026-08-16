@@ -1,3 +1,5 @@
+"""Pydantic-Schema fuer die Eingabe von /predict."""
+
 from pydantic import BaseModel, Field
 
 
