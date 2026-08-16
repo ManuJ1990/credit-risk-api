@@ -29,9 +29,6 @@ MODEL_PARAMS = {
     "n_estimators": 100,
     "max_depth": 4,
     "learning_rate": 0.1,
-    # TODO: Verhältnis aus y_train berechnen (559/241) statt aus dem
-    # Gesamtdatensatz. Fest eingetippt veraltet die Zahl still.
-    "scale_pos_weight": 700 / 300,
     "random_state": RANDOM_STATE,
     "eval_metric": "logloss",
 }
@@ -75,8 +72,15 @@ def encode_ordinal(df):
     return df, encoding
 
 
-def build_model(enable_categorical=False):
-    return XGBClassifier(**MODEL_PARAMS, enable_categorical=enable_categorical)
+def build_model(y, enable_categorical=False):
+    # aus y statt fest, damit es zur tatsächlichen Klassenverteilung passt
+    scale_pos_weight = (y == 0).sum() / (y == 1).sum()
+
+    return XGBClassifier(
+        **MODEL_PARAMS,
+        scale_pos_weight=scale_pos_weight,
+        enable_categorical=enable_categorical,
+    )
 
 
 def train_and_evaluate(X, y, enable_categorical=False):
@@ -84,7 +88,7 @@ def train_and_evaluate(X, y, enable_categorical=False):
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE
     )
 
-    model = build_model(enable_categorical)
+    model = build_model(y_train, enable_categorical)
     model.fit(X_train, y_train)
 
     # TODO: predict() schneidet bei 0.5 – sklearn-Default, keine bewusste
@@ -108,7 +112,8 @@ def cross_val_auc(X, y, enable_categorical=False, n_splits=5):
     """
     folds = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
     scores = cross_val_score(
-        build_model(enable_categorical), X, y, cv=folds, scoring="roc_auc"
+        # y komplett: StratifiedKFold erhält das Klassenverhältnis in jedem Fold
+        build_model(y, enable_categorical), X, y, cv=folds, scoring="roc_auc"
     )
     return scores.mean(), scores.std()
 
@@ -147,6 +152,7 @@ def main():
         mlflow.log_params(MODEL_PARAMS)
         mlflow.log_param("encoding", "ordinal")
         mlflow.log_param("test_size", TEST_SIZE)
+        mlflow.log_param("scale_poe_weight", model.get_params()["scale_pos_weight"])
         mlflow.log_metrics(
             {
                 "holdout_auc": metrics["auc"],
