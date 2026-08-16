@@ -62,21 +62,6 @@ def encode_ordinal(df):
     return df, encoding
 
 
-def encode_categorical(df):
-    """Kategorische Spalten als pandas-Typ 'category' markieren.
-
-    XGBoost erkennt den Typ und darf dann beliebige Kategorien-Gruppen
-    trennen, statt nur entlang der alphabetischen Reihenfolge zu schneiden.
-    """
-    df = df.copy()
-    categorical_cols = [c for c in df.columns if df[c].dtype == "object"]
-
-    for col in categorical_cols:
-        df[col] = df[col].astype("category")
-
-    return df
-
-
 def build_model(enable_categorical=False):
     return XGBClassifier(
         n_estimators=100,
@@ -147,26 +132,19 @@ def main():
     df = load_data()
     y = df[TARGET]
 
-    df_ordinal, encoding = encode_ordinal(df)
-    X_ordinal = df_ordinal.drop(columns=[TARGET])
-    model, metrics_ordinal = train_and_evaluate(X_ordinal, y)
+    df_encoded, encoding = encode_ordinal(df)
+    X = df_encoded.drop(columns=[TARGET])
 
-    X_categorical = encode_categorical(df).drop(columns=[TARGET])
-    _, metrics_categorical = train_and_evaluate(
-        X_categorical, y, enable_categorical=True
-    )
+    model, metrics = train_and_evaluate(X, y)
+    mean, std = cross_val_auc(X, y)
 
-    for name, m, X, cat in [
-        ("ordinal", metrics_ordinal, X_ordinal, False),
-        ("categorical", metrics_categorical, X_categorical, True),
-    ]:
-        mean, std = cross_val_auc(X, y, enable_categorical=cat)
-        print(
-            f"{name:12s} AUC {m['auc']:.3f}  P {m['precision']:.2f}  "
-            f"R {m['recall']:.2f}  CV {mean:.3f} +/- {std:.3f}"
-        )
+    print(f"AUC (Holdout):   {metrics['auc']:.3f}")
+    print(f"Precision:       {metrics['precision']:.2f}")
+    print(f"Recall:          {metrics['recall']:.2f}")
+    print(f"AUC (5-fold CV): {mean:.3f} +/- {std:.3f}")
 
-    save(model, encoding, X_ordinal)
+    save(model, encoding, X)
+
     print("Modell   ->", MODEL_PATH)
     print("Mapping  ->", MAPPING_PATH)
 

@@ -10,11 +10,25 @@ import pandas as pd
 from train import (
     TARGET,
     cross_val_auc,
-    encode_categorical,
     encode_ordinal,
     load_data,
     train_and_evaluate,
 )
+
+
+def encode_categorical(df):
+    """Kategorische Spalten als pandas-Typ 'category' markieren.
+
+    XGBoost erkennt den Typ und darf dann beliebige Kategorien-Gruppen
+    trennen, statt nur entlang der alphabetischen Reihenfolge zu schneiden.
+    """
+    df = df.copy()
+    categorical_cols = [c for c in df.columns if df[c].dtype == "object"]
+
+    for col in categorical_cols:
+        df[col] = df[col].astype("category")
+
+    return df
 
 
 def encode_onehot(df):
