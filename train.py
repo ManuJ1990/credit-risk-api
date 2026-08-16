@@ -6,6 +6,7 @@ Trainiert das Credit-Risk-Modell und schreibt Modell + Feature-Mapping nach mode
 Ersetzt den Trainingsteil aus notebooks/training.ipynb.
 """
 
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 
@@ -135,6 +136,7 @@ def save(model, encoding, X):
 
     # Single source of truth für app/ und das Portfolio-Widget.
     mapping = {
+        "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "feature_order": list(X.columns),
         "risk_thresholds": RISK_THRESHOLDS,
         "categorical": encoding,

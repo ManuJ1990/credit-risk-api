@@ -2,13 +2,21 @@ import json
 from pathlib import Path
 
 import joblib
-import numpy as np
+import pandas as pd
 
 MODEL_PATH = Path(__file__).parent.parent / "models" / "model.pkl"
 MAPPING_PATH = Path(__file__).parent.parent / "models" / "feature_mapping.json"
 
 model = joblib.load(MODEL_PATH)
-THRESHOLDS = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))["risk_thresholds"]
+_mapping = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
+THRESHOLDS = _mapping["risk_thresholds"]
+FEATURE_ORDER = _mapping["feature_order"]
+TRAINED_AT = _mapping["trained_at"]
+
+
+def to_frame(input_data: dict) -> pd.DataFrame:
+    """Eingabe in die Spaltenreihenfolge bringen, mit der trainiert wurde."""
+    return pd.DataFrame([input_data])[FEATURE_ORDER]
 
 
 def classify(score: float) -> str:
@@ -21,8 +29,7 @@ def classify(score: float) -> str:
 
 
 def predict(input_data: dict) -> dict:
-    features = np.array(list(input_data.values())).reshape(1, -1)
-    risk_score = float(model.predict_proba(features)[0][1])
+    risk_score = float(model.predict_proba(to_frame(input_data))[0][1])
 
     return {
         "risk_score": round(risk_score, 3),

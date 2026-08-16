@@ -1,22 +1,35 @@
-from fastapi import FastAPI
-from app.schemas import ApplicantInput
-from app.model import predict
-from app.explainer import get_top_factors
+import logging
 
-# FastAPI App initialisieren
+from fastapi import FastAPI, HTTPException
+
+from app.explainer import get_top_factors
+from app.model import FEATURE_ORDER, THRESHOLDS, TRAINED_AT, predict
+from app.schemas import ApplicantInput
+
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Credit Risk API")
+
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "model_trained_at": TRAINED_AT,
+        "n_features": len(FEATURE_ORDER),
+        "risk_thresholds": THRESHOLDS,
+    }
+
 
 @app.post("/predict")
 def predict_risk(input_data: ApplicantInput):
-    # Input zu Dictionary umwandeln
     data = input_data.model_dump()
-    
-    # Vorhersage + Erklärung
-    result = predict(data)
-    result["top_factors"] = get_top_factors(data)
-    
+
+    try:
+        result = predict(data)
+        result["top_factors"] = get_top_factors(data)
+    except Exception:
+        logger.exception("Vorhersage fehlgeschlagen fuer %s", data)
+        raise HTTPException(status_code=500, detail="Vorhersage fehlgeschlagen")
+
     return result
