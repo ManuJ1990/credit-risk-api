@@ -33,6 +33,15 @@ MODEL_PARAMS = {
     "eval_metric": "logloss",
 }
 
+# hergeleitet in experiments/find_thresholds.py: 0.20 aus dem Minimum der
+# Kostenkurve (5:1 laut german.doc), 0.50 als Grenze fuer automatische Ablehnung
+RISK_THRESHOLDS = {"low": 0.20, "high": 0.50}
+
+# aus german.doc: ein durchgewinkter Ausfall kostet 5, eine unnoetige
+# Ablehnung kostet 1
+COST_FN = 5
+COST_FP = 1
+
 # german.data hat keine Kopfzeile – Namen und Reihenfolge stammen aus german.doc.
 COLUMNS = [
     "checking_status", "duration", "credit_history", "purpose",
@@ -91,15 +100,17 @@ def train_and_evaluate(X, y, enable_categorical=False):
     model = build_model(y_train, enable_categorical)
     model.fit(X_train, y_train)
 
-    # TODO: predict() schneidet bei 0.5 – sklearn-Default, keine bewusste
-    # Entscheidung. Ersetzen durch Schwellen aus der 5:1-Kostenmatrix.
-    y_pred = model.predict(X_test)
     y_prob = model.predict_proba(X_test)[:, 1]
+    y_pred = (y_prob >= RISK_THRESHOLDS["low"]).astype(int)
+
+    fn = ((y_pred == 0) & (y_test == 1)).sum()
+    fp = ((y_pred == 1) & (y_test == 0)).sum()
 
     metrics = {
         "auc": roc_auc_score(y_test, y_prob),
         "precision": precision_score(y_test, y_pred),
         "recall": recall_score(y_test, y_pred),
+        "cost_per_case": (COST_FN * fn + COST_FP * fp) / len(y_test),
     }
     return model, metrics
 
@@ -125,6 +136,7 @@ def save(model, encoding, X):
     # Single source of truth für app/ und das Portfolio-Widget.
     mapping = {
         "feature_order": list(X.columns),
+        "risk_thresholds": RISK_THRESHOLDS,
         "categorical": encoding,
         "numeric": {
             col: {"min": int(X[col].min()), "max": int(X[col].max())}
@@ -150,6 +162,7 @@ def main():
         save(model, encoding, X)
 
         mlflow.log_params(MODEL_PARAMS)
+        mlflow.log_params(RISK_THRESHOLDS)
         mlflow.log_param("encoding", "ordinal")
         mlflow.log_param("test_size", TEST_SIZE)
         mlflow.log_param("scale_poe_weight", model.get_params()["scale_pos_weight"])
@@ -158,6 +171,7 @@ def main():
                 "holdout_auc": metrics["auc"],
                 "precision": metrics["precision"],
                 "recall": metrics["recall"],
+                "cost_per_case": metrics["cost_per_case"],
                 "cv_auc": mean,
                 "cv_std": std,
             }
@@ -168,6 +182,7 @@ def main():
     print(f"AUC (Holdout):   {metrics['auc']:.3f}")
     print(f"Precision:       {metrics['precision']:.2f}")
     print(f"Recall:          {metrics['recall']:.2f}")
+    print(f"Kosten je Fall:  {metrics['cost_per_case']:.3f}")
     print(f"AUC (5-fold CV): {mean:.3f} +/- {std:.3f}")
     print("Modell   ->", MODEL_PATH)
     print("Mapping  ->", MAPPING_PATH)

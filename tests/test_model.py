@@ -29,7 +29,7 @@ def test_model_loaded():
 
 def test_prediction_output():
     result = predict(SAMPLE_INPUT)
-    assert result["risk_class"] in ["low", "high"]
+    assert result["risk_class"] in ["low", "medium", "high"]
 
 def test_score_range():
     result = predict(SAMPLE_INPUT)

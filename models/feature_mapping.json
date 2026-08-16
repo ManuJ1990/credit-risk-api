@@ -21,6 +21,10 @@
     "telephone",
     "foreign_worker"
   ],
+  "risk_thresholds": {
+    "low": 0.2,
+    "high": 0.5
+  },
   "categorical": {
     "checking_status": {
       "A11": 0,
