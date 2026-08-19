@@ -64,3 +64,21 @@ def test_schema_endpoint_exposes_the_contract():
 
     assert set(body) >= {"feature_order", "risk_thresholds", "categorical", "numeric"}
     assert body["categorical"]["housing"]["A152"] == 1
+
+
+def test_predict_rejects_a_missing_api_key(monkeypatch, medium_profile):
+    monkeypatch.setenv("API_KEY", "test-secret")
+
+    response = client.post("/predict", json=medium_profile)
+
+    assert response.status_code == 401
+
+
+def test_predict_accepts_the_configured_api_key(monkeypatch, medium_profile):
+    monkeypatch.setenv("API_KEY", "test-secret")
+
+    response = client.post(
+        "/predict", json=medium_profile, headers={"X-API-Key": "test-secret"}
+    )
+
+    assert response.status_code == 200
