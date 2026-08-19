@@ -1,8 +1,9 @@
 """FastAPI-Endpunkte der Credit Risk API."""
 
 import logging
+import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 
 from app.explainer import get_top_factors
 from app.model import FEATURE_ORDER, MAPPING, THRESHOLDS, TRAINED_AT, predict
@@ -21,12 +22,20 @@ def health():
         "model_trained_at": TRAINED_AT,
         "n_features": len(FEATURE_ORDER),
         "risk_thresholds": THRESHOLDS,
+        "auth": "enabled" if os.environ.get("API_KEY") else "disabled",
     }
 
 
 @app.post("/predict")
-def predict_risk(input_data: ApplicantInput):
+def predict_risk(
+    input_data: ApplicantInput,
+    x_api_key: str | None = Header(default=None),
+    ):
     """Risikozone und die drei einflussreichsten Felder fuer einen Antrag."""
+    expected = os.environ.get("API_KEY")
+    if expected and x_api_key != expected:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
     data = input_data.model_dump()
 
     try:
