@@ -5,8 +5,8 @@ A REST API that scores the default risk of a loan application and explains the r
 Input: 20 applicant features → Output: a risk score, one of three risk zones, and the three fields that influenced the score most.
 
 **Live:** [API docs](https://credit-risk-api-50139538822.europe-west3.run.app/docs) ·
-**Demo:** [interactive widget](https://manuel-portfolio-alpha.vercel.app/#projects) ·
-**Write-up:** [what I got wrong and how I found it](https://manuel-portfolio-alpha.vercel.app/blog/credit-risk-api)
+**Demo:** [interactive widget](https://manueljunker.at/#projects) ·
+**Write-up:** [what I got wrong and how I found it](https://manueljunker.at/blog/credit-risk-api)
 
 ---
 
