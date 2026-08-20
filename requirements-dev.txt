@@ -1,5 +1,15 @@
 -r requirements.txt
+
+# Experimente und Protokollierung
 mlflow
+
+# Tests
 pytest
 httpx
+
+# Linting
 ruff
+
+# Notebook (notebooks/eda.ipynb)
+jupyter
+matplotlib
